@@ -1,0 +1,192 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PROFESSIONAL BLUE THEME  —  Legal / Enterprise SaaS
+   next-themes adds class="dark" or class="light" on <html>.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@layer base {
+
+  /* ── LIGHT ───────────────────────────────────────────────────────────────── */
+  :root {
+    --background:             210 28% 97%;
+    --foreground:             220 30% 10%;
+
+    --card:                   0 0% 100%;
+    --card-foreground:        220 30% 10%;
+
+    --popover:                0 0% 100%;
+    --popover-foreground:     220 30% 10%;
+
+    --primary:                213 85% 46%;
+    --primary-foreground:     0 0% 100%;
+
+    --secondary:              214 20% 92%;
+    --secondary-foreground:   220 20% 28%;
+
+    --muted:                  214 20% 93%;
+    --muted-foreground:       215 16% 50%;
+
+    --accent:                 213 85% 46%;
+    --accent-foreground:      0 0% 100%;
+
+    --destructive:            0 68% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:                 214 20% 88%;
+    --input:                  214 20% 88%;
+    --ring:                   213 85% 46%;
+
+    --chart-1:                213 94% 62%;
+    --chart-2:                213 85% 46%;
+    --chart-3:                220 80% 38%;
+    --chart-4:                199 85% 52%;
+    --chart-5:                230 60% 62%;
+
+    --sidebar-background:     220 24% 96%;
+    --sidebar-foreground:     220 20% 30%;
+    --sidebar-primary:        213 85% 46%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:         214 20% 90%;
+    --sidebar-accent-foreground: 220 20% 20%;
+    --sidebar-border:         214 20% 88%;
+    --sidebar-ring:           213 85% 46%;
+
+    --radius: 0.5rem;
+  }
+
+  /* ── DARK ────────────────────────────────────────────────────────────────── */
+  .dark {
+    --background:             222 26%  7%;
+    --foreground:             214 30% 90%;
+
+    --card:                   222 22% 10%;
+    --card-foreground:        214 30% 90%;
+
+    --popover:                222 22% 10%;
+    --popover-foreground:     214 30% 90%;
+
+    --primary:                213 90% 62%;
+    --primary-foreground:     0 0% 100%;
+
+    --secondary:              220 20% 16%;
+    --secondary-foreground:   214 20% 70%;
+
+    --muted:                  220 20% 13%;
+    --muted-foreground:       215 16% 46%;
+
+    --accent:                 213 90% 62%;
+    --accent-foreground:      0 0% 100%;
+
+    --destructive:            0 62% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:                 220 18% 18%;
+    --input:                  220 18% 18%;
+    --ring:                   213 90% 62%;
+
+    --chart-1:                213 90% 68%;
+    --chart-2:                213 90% 54%;
+    --chart-3:                220 78% 44%;
+    --chart-4:                199 80% 58%;
+    --chart-5:                230 58% 65%;
+
+    --sidebar-background:     222 26%  8%;
+    --sidebar-foreground:     214 20% 72%;
+    --sidebar-primary:        213 90% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:         220 20% 14%;
+    --sidebar-accent-foreground: 214 20% 85%;
+    --sidebar-border:         220 18% 16%;
+    --sidebar-ring:           213 90% 62%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02", "cv03";
+  }
+
+  .font-display { font-family: "Space Grotesk", sans-serif; }
+  .font-mono    { font-family: "JetBrains Mono", "Fira Mono", monospace; }
+}
+
+@layer utilities {
+  .text-glow-sm {
+    text-shadow: 0 0 10px hsl(var(--primary) / 0.3);
+  }
+  .box-glow-sm {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.18),
+      0 0 12px hsl(var(--primary) / 0.08);
+  }
+  .box-glow {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.22),
+      0 0 20px hsl(var(--primary) / 0.10);
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-dot 2.8s ease-in-out infinite;
+  }
+
+  /* Thin scrollbar */
+  ::-webkit-scrollbar       { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.4);
+  }
+}
+
+/* ── Fix Funnel / FeatureAdoption gradient bars ─────────────────────────────
+   These pages use `from-primary to-emerald-300` — override to blue family.  */
+.bg-gradient-to-r.from-primary.to-emerald-300 {
+  background-image: linear-gradient(
+    to right,
+    hsl(var(--primary)),
+    hsl(213 90% 80%)
+  ) !important;
+}
+
+/* ── Keyframes ────────────────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+@keyframes accordion-down {
+  from { height: 0; }
+  to   { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to   { height: 0; }
+}
+
+/* ── WCAG 2.3.3 — Prefers Reduced Motion ────────────────────────────────────
+   Disables all animations for users who have requested reduced motion
+   in their OS settings. Required for accessibility compliance.              */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
