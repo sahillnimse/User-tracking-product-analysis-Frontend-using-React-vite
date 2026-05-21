@@ -1,5 +1,5 @@
 import { PanelCard } from "@/components/dashboard/StatCard";
-import { retentionCohort } from "@/lib/analyticsData";
+import { retentionCohort } from "@/hooks/useAnalytics";
 import { cn } from "@/lib/utils";
 
 const cellColor = (v: number) => {

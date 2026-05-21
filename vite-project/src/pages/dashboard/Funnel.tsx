@@ -1,6 +1,6 @@
 import { ArrowDown, AlertTriangle } from "lucide-react";
 import { PanelCard } from "@/components/dashboard/StatCard";
-import { activationFunnel } from "@/lib/analyticsData";
+import { activationFunnel } from "@/hooks/useAnalytics";
 import { cn } from "@/lib/utils";
 
 export default function Funnel() {

@@ -2,7 +2,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { PanelCard } from "@/components/dashboard/StatCard";
-import { featureAdoption, featureUsageOverTime } from "@/lib/analyticsData";
+import { featureAdoption, featureUsageOverTime } from "@/hooks/useAnalytics";
 import { cn } from "@/lib/utils";
 
 const tooltipStyle = {

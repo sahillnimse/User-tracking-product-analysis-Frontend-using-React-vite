@@ -1,6 +1,6 @@
 import { Sparkles, Mail } from "lucide-react";
 import { PanelCard } from "@/components/dashboard/StatCard";
-import { conversionScores } from "@/lib/analyticsData";
+import { conversionScores } from "@/hooks/useAnalytics";
 import { cn } from "@/lib/utils";
 
 const scoreTier = (s: number) =>

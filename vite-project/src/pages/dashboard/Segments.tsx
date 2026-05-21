@@ -3,7 +3,7 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import { PanelCard } from "@/components/dashboard/StatCard";
-import { segmentBreakdown, zeroEngagement } from "@/lib/analyticsData";
+import { segmentBreakdown, zeroEngagement } from "@/hooks/useAnalytics";
 
 const tooltipStyle = {
   backgroundColor: "hsl(var(--card))",

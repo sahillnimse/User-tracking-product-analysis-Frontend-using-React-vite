@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Circle } from "lucide-react";
 import { PanelCard } from "@/components/dashboard/StatCard";
-import { eventStream, topEvents } from "@/lib/analyticsData";
+import { eventStream, topEvents } from "@/hooks/useAnalytics";
 import { cn } from "@/lib/utils";
 
 const categoryColor: Record<string, string> = {
