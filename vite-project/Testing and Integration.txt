@@ -1,0 +1,213 @@
+# Testing, Live Integration & Pre-Production Checklist
+
+## 1. Local Dev & Type-Check (run these FIRST)
+
+```bash
+# Install deps (if not already done)
+npm install
+
+# TypeScript strict compile — catches every type error without building
+npx tsc --noEmit
+
+# If you see path alias errors (@/...) make sure tsconfig.json has:
+# "paths": { "@/*": ["./src/*"] }
+
+# ESLint — catches unused vars, bad hooks deps, accessibility issues
+npx eslint src --ext .ts,.tsx --max-warnings 0
+
+# Both together (CI-friendly)
+npx tsc --noEmit && npx eslint src --ext .ts,.tsx
+```
+
+---
+
+## 2. Unit Tests
+
+```bash
+# Run existing tests (vitest is already configured)
+npm run test
+
+# Watch mode during development
+npm run test -- --watch
+
+# Coverage report
+npm run test -- --coverage
+```
+
+The project already has:
+- `src/lib/csvAnalysis.test.ts` — CSV parser edge cases
+- `src/test/example.test.ts`   — example scaffold
+
+**Add these tests before production:**
+
+```bash
+# Create test files next to the files they test:
+src/hooks/useAnalytics.test.ts    # test isEmpty narrowing + date filtering
+src/lib/auth.test.ts              # test loginWithEmail + role checks
+src/hooks/usePageTracking.test.ts # test view recording + aggregation
+```
+
+---
+
+## 3. Build & Preview (the closest thing to production locally)
+
+```bash
+# Full production build
+npm run build
+
+# If it builds without errors, serve it locally:
+npm run preview
+
+# Open http://localhost:4173  (not 5173 — that's dev)
+# Test ALL routes manually at this URL, not the dev server
+```
+
+**What to check in preview mode:**
+- [ ] Login gate works (try a bad email → should fail)
+- [ ] Demo mode loads all charts
+- [ ] Date range picker filters data
+- [ ] Page Analytics snake chart moves
+- [ ] Sidebar mini widget shows view counts
+- [ ] CSV upload parses and shows stats
+- [ ] No console errors on any page
+
+---
+
+## 4. React-specific "Doctor" Checks
+
+```bash
+# Check for missing useEffect cleanup / memory leaks
+npx eslint src --rule '{"react-hooks/exhaustive-deps": "error"}'
+
+# Bundle size analysis — make sure recharts isn't pulling in unused stuff
+npm run build -- --mode production
+npx vite-bundle-visualizer    # or: npx source-map-explorer dist/assets/*.js
+
+# Lighthouse audit (run after npm run preview)
+npx lighthouse http://localhost:4173 --output html --output-path ./lighthouse.html
+open lighthouse.html
+```
+
+---
+
+## 5. Live Data Integration (when you're ready)
+
+### What shape your API must return
+
+Your backend needs a **single GET endpoint** that returns this exact JSON:
+
+```json
+{
+  "totalUsers":     1756,
+  "subscribed":     7,
+  "activation":     11.9,
+  "conversion":     0.40,
+  "draftsCreated":  333,
+  "zeroEngagement": 1547,
+
+  "signupsByMonth": [
+    { "month": "Jan 26", "signups": 74, "subs": 3 }
+  ],
+  "engagementSegments": [
+    { "name": "Power (10+)", "value": 2, "color": "#3b82f6" }
+  ],
+  "featureAdoption": [
+    { "feature": "Draft", "users": 181, "totalUses": 333, "pct": 10.3 }
+  ],
+  "planBreakdown": [
+    { "plan": "Free Trial", "count": 1750, "color": "#94a3b8" }
+  ],
+  "cohortRetention": [
+    { "month": "Jan 26", "total": 74, "returned": 21,
+      "returnRate": 28.4, "activated": 8, "activationRate": 10.8 }
+  ],
+  "featureDepthFunnel": [
+    { "label": "Signed up", "count": 1756 }
+  ]
+}
+```
+
+### How to connect it
+
+1. Open the dashboard in-app  
+2. Click the data-source indicator (top-right, shows "demo")  
+3. Select **"Live API"**  
+4. Paste your endpoint URL, e.g. `https://api.lawgichub.com/analytics/snapshot`  
+5. Click **"Save & connect"** — it polls every 30 seconds automatically
+
+### CORS — make sure your API sets these headers
+
+```
+Access-Control-Allow-Origin: https://your-analytics-domain.com
+Access-Control-Allow-Methods: GET
+```
+
+### Security — protect the endpoint on your backend
+
+```python
+# Example: Django / FastAPI — verify the request carries a valid internal token
+@app.get("/analytics/snapshot")
+def snapshot(request: Request):
+    token = request.headers.get("X-Analytics-Key")
+    if token != settings.ANALYTICS_SECRET_KEY:
+        raise HTTPException(status_code=403)
+    return build_snapshot()  # query your DB and return the JSON above
+```
+
+Then in `src/context/AppContext.tsx` → `fetchApi()`, add the header:
+
+```ts
+const res = await fetch(apiUrl, {
+  headers: { "X-Analytics-Key": import.meta.env.VITE_ANALYTICS_KEY },
+  signal: AbortSignal.timeout(8000),
+});
+```
+
+Add to `.env.local`:
+```
+VITE_ANALYTICS_KEY=your-secret-here
+```
+
+---
+
+## 6. Pre-Production Checklist
+
+```
+Frontend:
+[ ] npm run build succeeds with zero errors
+[ ] npx tsc --noEmit passes
+[ ] All routes tested in preview mode
+[ ] Auth gate blocks unknown emails
+[ ] Demo mode works fully offline (fallback for outages)
+[ ] No sensitive data in source (no hardcoded keys)
+[ ] .env.local is in .gitignore
+
+Backend / API:
+[ ] /analytics/snapshot requires auth (token / session)
+[ ] Returns the correct JSON shape (test with curl)
+[ ] CORS locked to your analytics domain only
+[ ] Rate-limited (prevent abuse)
+[ ] Response cached server-side (DB query ≤ 5 seconds)
+
+Deployment:
+[ ] Deploy behind auth (Vercel → Password Protection, Cloudflare Access,
+    or Nginx basic auth) as a second layer on top of the email gate
+[ ] Environment variables set in hosting platform (not in code)
+[ ] SSL/TLS enabled
+```
+
+---
+
+## 7. Quick Smoke-Test Script (bash)
+
+Run this after `npm run preview` to hit every route:
+
+```bash
+BASE="http://localhost:4173"
+for path in / /events /pageanalytics /pageflow /funnel /health /features /conversion /segments /retention /csv; do
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$path")
+  echo "$CODE  $path"
+done
+```
+
+All should return `200`. A `404` means the route is missing from App.tsx.

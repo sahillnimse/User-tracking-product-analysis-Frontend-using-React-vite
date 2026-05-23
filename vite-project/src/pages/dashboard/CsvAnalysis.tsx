@@ -10,9 +10,9 @@ import {
   Search, MessageSquare, Gavel, Database, ChevronDown, Upload,
   CheckCircle, AlertCircle, X, BookOpen,
 } from "lucide-react";
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useCsvData }   from "@/context/CsvDataContext";
-import { useAnalytics } from "@/hooks/useAnalytics";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useCsvData }   from "@/context/AppContext";
+import { analyticsData } from "@/lib/analyticsData";
 import { cn }           from "@/lib/utils";
 import type { FeatureAdoptionItem } from "@/types";
 
@@ -324,18 +324,57 @@ function DataPreview({ rows, columns }: {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function CsvAnalysis() {
-  const { uploadCSV, clearCSV, oversized } = useCsvData();
-  const data = useAnalytics();
-  const s    = data.csvStats;
+  const { stats, fileName, uploadCSV, clearCSV, oversized } = useCsvData();
+
+  const data = useMemo(() => {
+    if (stats) {
+      return {
+        source:             "csv" as const,
+        fileName:           fileName ?? stats.fileName,
+        csvStats:           stats,
+        totalUsers:         stats.totalUsers,
+        subscribed:         stats.subscribed,
+        activation:         stats.activation,
+        conversion:         stats.conversion,
+        draftsCreated:      stats.draftsCreated,
+        zeroEngagement:     stats.zeroEngagement,
+        signupsByMonth:     stats.signupsByMonth,
+        engagementSegments: stats.engagementSegments,
+        featureAdoption:    stats.featureAdoption,
+        planBreakdown:      stats.planBreakdown,
+        featureDepthFunnel: stats.featureDepthFunnel,
+        cohortRetention:    stats.cohortRetention,
+      };
+    }
+    return {
+      source:             "static" as const,
+      fileName:           null as string | null,
+      csvStats:           null,
+      totalUsers:         analyticsData.totalUsers,
+      subscribed:         analyticsData.subscribed,
+      activation:         analyticsData.activation,
+      conversion:         analyticsData.conversion,
+      draftsCreated:      analyticsData.draftsCreated,
+      zeroEngagement:     analyticsData.zeroEngagement,
+      signupsByMonth:     analyticsData.signupsByMonth,
+      engagementSegments: analyticsData.engagementSegments,
+      featureAdoption:    analyticsData.featureAdoption,
+      planBreakdown:      analyticsData.planBreakdown,
+      featureDepthFunnel: analyticsData.featureDepthFunnel,
+      cohortRetention:    analyticsData.cohortRetention,
+    };
+  }, [stats, fileName]);
+
+  const s = data.csvStats;
 
   // Auto-load /public/users-export.csv if no file is loaded yet
   useEffect(() => {
-    if (data.fileName) return;
+    if (fileName) return;
     fetch("/users-export.csv")
       .then(r => { if (!r.ok) throw new Error("not found"); return r.text(); })
       .then(text => uploadCSV(text, "users-export.csv"))
       .catch(() => { /* File absent — wait for manual upload */ });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fileName, uploadCSV]);
 
   const exportSummary = () => {
     const csv = [

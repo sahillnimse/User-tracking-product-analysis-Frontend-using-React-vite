@@ -1,24 +1,43 @@
+// src/pages/dashboard/Funnel.tsx
 import { ArrowDown, AlertTriangle } from "lucide-react";
-import { PanelCard } from "@/components/dashboard/StatCard";
-import { activationFunnel } from "@/hooks/useAnalytics";
-import { cn } from "@/lib/utils";
+import { useNavigate }              from "react-router-dom";
+import { PanelCard }                from "@/components/dashboard/StatCard";
+import { EmptyDataState }           from "@/components/dashboard/EmptyDataState";
+import { useAnalytics }             from "@/hooks/useAnalytics";
+import { cn }                       from "@/lib/utils";
 
 export default function Funnel() {
-  const drops = activationFunnel.map((s, i) => {
+  const analytics = useAnalytics();
+  const navigate  = useNavigate();
+
+  if (analytics.isEmpty) return <EmptyDataState />;
+
+  const { featureDepthFunnel, totalUsers } = analytics;
+
+  const steps = featureDepthFunnel.map(s => ({
+    step:  s.label,
+    users: s.count,
+    rate:  totalUsers > 0 ? parseFloat(((s.count / totalUsers) * 100).toFixed(1)) : 0,
+  }));
+
+  const drops = steps.map((s, i) => {
     if (i === 0) return { ...s, drop: 0, dropPct: 0 };
-    const prev = activationFunnel[i - 1];
+    const prev = steps[i - 1];
     const drop = prev.users - s.users;
-    return { ...s, drop, dropPct: (drop / prev.users) * 100 };
+    return { ...s, drop, dropPct: prev.users > 0 ? (drop / prev.users) * 100 : 0 };
   });
 
-  const biggestDropIdx = drops.reduce((max, s, i) => (s.dropPct > drops[max].dropPct ? i : max), 1);
+  const biggestDropIdx = drops.reduce(
+    (max, s, i, arr) => (s.dropPct > arr[max].dropPct ? i : max),
+    1
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold">Activation Funnel</h1>
         <p className="font-mono text-xs text-muted-foreground">
-          See exactly where users drop off in onboarding and feature usage
+          Where users drop off in onboarding and feature usage
         </p>
       </div>
 
@@ -27,30 +46,41 @@ export default function Funnel() {
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             Top of funnel
           </div>
-          <div className="mt-2 font-display text-2xl font-bold">10,000</div>
-          <div className="mt-1 font-mono text-[11px] text-muted-foreground">signups in period</div>
+          <div className="mt-2 font-display text-2xl font-bold">
+            {steps[0]?.users.toLocaleString() ?? 0}
+          </div>
+          <div className="mt-1 font-mono text-[11px] text-muted-foreground">total signups</div>
         </div>
+
         <div className="rounded-lg border border-border/60 bg-card p-4">
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            Activated (day-7)
+            Activated (used any feature)
           </div>
-          <div className="mt-2 font-display text-2xl font-bold text-primary text-glow-sm">9.8%</div>
-          <div className="mt-1 font-mono text-[11px] text-muted-foreground">980 users reached activation</div>
-        </div>
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-destructive">
-            <AlertTriangle className="h-3 w-3" /> biggest drop-off
-          </div>
-          <div className="mt-2 font-display text-2xl font-bold text-destructive">
-            {drops[biggestDropIdx].dropPct.toFixed(1)}%
+          <div className="mt-2 font-display text-2xl font-bold text-primary text-glow-sm">
+            {steps[1]?.rate ?? 0}%
           </div>
           <div className="mt-1 font-mono text-[11px] text-muted-foreground">
-            at "{drops[biggestDropIdx].step}"
+            {steps[1]?.users.toLocaleString() ?? 0} users reached activation
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-destructive">
+            <AlertTriangle className="h-3 w-3" /> Biggest drop-off
+          </div>
+          <div className="mt-2 font-display text-2xl font-bold text-destructive">
+            -{drops[biggestDropIdx]?.dropPct.toFixed(1)}%
+          </div>
+          <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+            at "{drops[biggestDropIdx]?.step}"
           </div>
         </div>
       </div>
 
-      <PanelCard title="Step-by-step funnel" subtitle="Users remaining and drop-off at each step">
+      <PanelCard
+        title="Step-by-step funnel"
+        subtitle="Click a step to drill into users at that stage"
+      >
         <div className="space-y-3">
           {drops.map((s, i) => (
             <div key={s.step}>
@@ -63,14 +93,21 @@ export default function Funnel() {
                 </div>
               )}
               <div
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/funnel/${encodeURIComponent(s.step)}`)}
+                onKeyDown={e => e.key === "Enter" && navigate(`/funnel/${encodeURIComponent(s.step)}`)}
                 className={cn(
-                  "rounded-lg border p-4 transition-all",
-                  i === biggestDropIdx ? "border-destructive/60 bg-destructive/5" : "border-border/60 bg-card",
+                  "cursor-pointer rounded-lg border p-4 transition-all hover:border-primary/50 hover:bg-muted/20",
+                  i === biggestDropIdx
+                    ? "border-destructive/60 bg-destructive/5"
+                    : "border-border/60 bg-card",
                 )}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/30 bg-primary/10 font-mono text-xs text-primary">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md
+                      border border-primary/30 bg-primary/10 font-mono text-xs text-primary">
                       {String(i + 1).padStart(2, "0")}
                     </div>
                     <div>
@@ -84,8 +121,8 @@ export default function Funnel() {
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-300 transition-all"
-                    style={{ width: `${s.rate}%` }}
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-300 transition-all duration-700"
+                    style={{ width: `${Math.max(s.rate, 0.3)}%` }}
                   />
                 </div>
               </div>
