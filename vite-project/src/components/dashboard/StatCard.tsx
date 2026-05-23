@@ -1,22 +1,31 @@
+// src/components/dashboard/StatCard.tsx
+// FIX: added optional onClick prop so stat cards can be interactive.
+
 import { ArrowDownRight, ArrowUpRight, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
   label:   string;
   value:   string;
-  delta?:  number;   // numeric % change → shows ↑↓ arrow + "vs last period"
-  note?:   string;   // plain text below value, no arrow (use this for strings)
+  delta?:  number;
+  note?:   string;
   icon?:   LucideIcon;
   suffix?: string;
+  onClick?: () => void;   // FIX: new — makes card clickable (e.g. drill-through)
 }
 
-export function StatCard({ label, value, delta, note, icon: Icon, suffix }: StatCardProps) {
+export function StatCard({ label, value, delta, note, icon: Icon, suffix, onClick }: StatCardProps) {
   const positive = (delta ?? 0) >= 0;
 
   return (
-    <div className="group relative overflow-hidden rounded-lg border border-border/60 bg-card p-4
-      transition-all hover:border-primary/40 hover:box-glow-sm">
-
+    <div
+      onClick={onClick}
+      className={cn(
+        "group relative overflow-hidden rounded-lg border border-border/60 bg-card p-4",
+        "transition-all hover:border-primary/40 hover:box-glow-sm",
+        onClick && "cursor-pointer select-none active:scale-[0.98]",
+      )}
+    >
       {/* Top accent line on hover */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-primary/40
         via-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
@@ -54,10 +63,18 @@ export function StatCard({ label, value, delta, note, icon: Icon, suffix }: Stat
         </div>
       )}
 
-      {/* Plain text note (no arrow, no delta needed) */}
+      {/* Plain text note */}
       {note && delta === undefined && (
         <div className="mt-3 font-mono text-xs text-muted-foreground">
           {note}
+        </div>
+      )}
+
+      {/* Click hint */}
+      {onClick && (
+        <div className="mt-2 font-mono text-[10px] text-primary/50 opacity-0
+          group-hover:opacity-100 transition-opacity">
+          Click to view all →
         </div>
       )}
     </div>

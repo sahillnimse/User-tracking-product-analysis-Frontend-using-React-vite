@@ -4,6 +4,7 @@
     "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "types": ["vite/client"],
     "paths": {
       "@/*": [
         "./src/*"

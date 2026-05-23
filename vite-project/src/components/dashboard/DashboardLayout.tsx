@@ -1,15 +1,22 @@
 // src/components/dashboard/DashboardLayout.tsx
+// FIX: LiveStatus now imports useCsvData and shows a "CSV Data" toggle
+//      option whenever a CSV file is loaded. Mode label "no data" → "offline".
+
 import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate }         from "react-router-dom";
 import {
   Bell, Search, Moon, Sun, Calendar, ChevronDown, Check, X,
-  Circle, RefreshCw, Settings2, Scale,
+  Circle, RefreshCw, Settings2, Scale, LogOut, FileSpreadsheet,
 } from "lucide-react";
 import { useTheme }                     from "next-themes";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar }   from "./AppSidebar";
-import { AppProvider, useDateRange, useLiveData, DATE_PRESETS, fmtDate, toInputDate, type DateRange } from "@/context/AppContext";
+import {
+  AppProvider, useDateRange, useLiveData, useCsvData,
+  DATE_PRESETS, fmtDate, toInputDate, type DateRange,
+} from "@/context/AppContext";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { getCurrentUser, logout } from "@/lib/auth";
 
 // ── Date Range Picker ─────────────────────────────────────────────────────────
 function DateRangePicker() {
@@ -30,7 +37,6 @@ function DateRangePicker() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // Sync input vals when range changes externally
   useEffect(() => {
     setFromVal(toInputDate(range.from));
     setToVal(toInputDate(range.to));
@@ -131,6 +137,8 @@ function DateRangePicker() {
 // ── Live Data Status Indicator ────────────────────────────────────────────────
 function LiveStatus() {
   const { mode, lastUpdated, isPolling, refresh, setMode, apiUrl, setApiUrl } = useLiveData();
+  // FIX: read csvData so we can offer "CSV Data" as a source option
+  const { fileName } = useCsvData();
   const [showConfig, setShowConfig] = useState(false);
   const [urlDraft,   setUrlDraft]   = useState(apiUrl);
   const ref = useRef<HTMLDivElement>(null);
@@ -143,10 +151,16 @@ function LiveStatus() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const statusLabel = mode === "demo" ? "demo" : mode === "api" ? "live" : "no data";
-  const statusColor = mode === "none"
-    ? "text-muted-foreground" : mode === "demo"
-    ? "text-amber-400" : "text-primary";
+  // FIX: replaced "no data" with "offline"; added "csv" label
+  const statusLabel =
+    mode === "demo" ? "demo" :
+    mode === "api"  ? "live" :
+    mode === "csv"  ? "csv"  : "offline";
+
+  const statusColor =
+    mode === "none" ? "text-muted-foreground" :
+    mode === "csv"  ? "text-emerald-400"      :
+    mode === "demo" ? "text-amber-400"        : "text-primary";
 
   return (
     <div ref={ref} className="relative">
@@ -157,7 +171,9 @@ function LiveStatus() {
       >
         {isPolling
           ? <RefreshCw className="h-3 w-3 animate-spin text-primary" />
-          : <Circle className={`h-2 w-2 fill-current ${mode !== "none" ? "animate-pulse" : ""} ${statusColor}`} />}
+          : mode === "csv"
+            ? <FileSpreadsheet className={`h-3 w-3 ${statusColor}`} />
+            : <Circle className={`h-2 w-2 fill-current ${mode !== "none" ? "animate-pulse" : ""} ${statusColor}`} />}
         <span className={statusColor}>{statusLabel}</span>
         <Settings2 className="h-3 w-3 text-muted-foreground" />
       </button>
@@ -167,7 +183,7 @@ function LiveStatus() {
           bg-card shadow-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <p className="font-mono text-xs font-semibold text-foreground">Data Source</p>
-            {lastUpdated && (
+            {lastUpdated && mode !== "csv" && (
               <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
                 Updated {lastUpdated.toLocaleTimeString()}
               </p>
@@ -175,18 +191,50 @@ function LiveStatus() {
           </div>
 
           <div className="p-3 space-y-1.5 border-b border-border">
-            {(["demo","api","none"] as const).map(m => (
-              <button key={m} onClick={() => setMode(m)}
+            {/* Demo mode */}
+            <button onClick={() => setMode("demo")}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2
+                font-mono text-xs transition-colors
+                ${mode === "demo" ? "bg-primary/10 text-primary" : "hover:bg-muted/50 text-foreground"}`}
+            >
+              <span>Demo mode (sample data)</span>
+              {mode === "demo" && <Check className="h-3 w-3" />}
+            </button>
+
+            {/* CSV mode — only visible when a file is loaded */}
+            {fileName && (
+              <button onClick={() => setMode("csv")}
                 className={`flex w-full items-center justify-between rounded-md px-3 py-2
                   font-mono text-xs transition-colors
-                  ${mode === m ? "bg-primary/10 text-primary" : "hover:bg-muted/50 text-foreground"}`}
+                  ${mode === "csv" ? "bg-emerald-500/10 text-emerald-400" : "hover:bg-muted/50 text-foreground"}`}
               >
-                <span className="capitalize">
-                  {m === "demo" ? "Demo mode (sample data)" : m === "api" ? "Live API" : "No data"}
+                <span className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-3 w-3" />
+                  <span className="truncate max-w-[160px]">CSV: {fileName}</span>
                 </span>
-                {mode === m && <Check className="h-3 w-3" />}
+                {mode === "csv" && <Check className="h-3 w-3" />}
               </button>
-            ))}
+            )}
+
+            {/* Live API */}
+            <button onClick={() => setMode("api")}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2
+                font-mono text-xs transition-colors
+                ${mode === "api" ? "bg-primary/10 text-primary" : "hover:bg-muted/50 text-foreground"}`}
+            >
+              <span>Live API</span>
+              {mode === "api" && <Check className="h-3 w-3" />}
+            </button>
+
+            {/* Offline */}
+            <button onClick={() => setMode("none")}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2
+                font-mono text-xs transition-colors
+                ${mode === "none" ? "bg-primary/10 text-primary" : "hover:bg-muted/50 text-foreground"}`}
+            >
+              <span>Offline (no data)</span>
+              {mode === "none" && <Check className="h-3 w-3" />}
+            </button>
           </div>
 
           {mode === "api" && (
@@ -211,13 +259,15 @@ function LiveStatus() {
             </div>
           )}
 
-          <div className="px-3 pb-3">
-            <button onClick={() => { refresh(); setShowConfig(false); }}
-              className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground
-                hover:text-foreground transition-colors">
-              <RefreshCw className="h-3 w-3" /> Refresh now
-            </button>
-          </div>
+          {(mode === "demo" || mode === "api") && (
+            <div className="px-3 pb-3">
+              <button onClick={() => { refresh(); setShowConfig(false); }}
+                className="flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground
+                  hover:text-foreground transition-colors">
+                <RefreshCw className="h-3 w-3" /> Refresh now
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -290,6 +340,13 @@ function GlobalSearch() {
 function Layout() {
   usePageTracking();
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
+  const user = getCurrentUser();
+
+  const handleLogout = () => {
+    logout();
+    window.location.reload();
+  };
 
   return (
     <SidebarProvider>
@@ -323,11 +380,24 @@ function Layout() {
                 {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
               </button>
 
-              <div className="flex h-8 w-8 items-center justify-center rounded-full
-                bg-primary/20 font-mono text-xs text-primary font-semibold cursor-pointer
-                hover:bg-primary/30 transition-colors">
-                AK
+              <div
+                title={user?.name ?? "Unknown user"}
+                className="flex h-8 w-8 items-center justify-center rounded-full
+                  bg-primary/20 font-mono text-xs text-primary font-semibold
+                  cursor-default select-none"
+              >
+                {user?.initials ?? "?"}
               </div>
+
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="rounded-md border border-border/60 bg-muted/40 p-2
+                  text-muted-foreground hover:text-destructive transition-colors"
+                aria-label="Sign out"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
             </div>
           </header>
 

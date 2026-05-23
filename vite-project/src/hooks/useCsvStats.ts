@@ -1,5 +1,8 @@
 // src/hooks/useCsvStats.ts
-import { useCsvData }   from "@/context/CsvDataContext";
+// FIX: was importing from "@/context/CsvDataContext" (the old stale file that
+// will be deleted). Now imports from the unified "@/context/AppContext".
+
+import { useCsvData } from "@/context/AppContext";
 import type { ParsedStats } from "@/types";
 
 export interface UseCsvStatsResult {

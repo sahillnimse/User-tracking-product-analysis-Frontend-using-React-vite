@@ -1,10 +1,13 @@
 // src/hooks/useAnalytics.ts
 // Primary hook for all dashboard pages (except CSV Analysis).
-// Returns live/demo data filtered by the selected date range.
+// Returns live/demo/csv data filtered by the selected date range.
 // Returns isEmpty:true when mode === "none" so pages can show empty state.
+//
+// FIX: added "csv" mode — reads ParsedStats from useCsvData() and maps it
+//      to AnalyticsData, so every page respects the selected data source.
 
 import { useMemo }          from "react";
-import { useLiveData, useDateRange } from "@/context/AppContext";
+import { useLiveData, useDateRange, useCsvData } from "@/context/AppContext";
 import { analyticsData }    from "@/lib/analyticsData";
 import type {
   MonthlySignup, CohortRow,
@@ -36,7 +39,8 @@ export type AnalyticsEmpty = { isEmpty: true; source: "none" };
 
 export type AnalyticsData = {
   isEmpty: false;
-  source: "demo" | "live";
+  // FIX: added "csv" to source discriminator
+  source: "demo" | "live" | "csv";
   // core KPIs
   totalUsers: number;
   subscribed: number;
@@ -61,13 +65,54 @@ export type AnalyticsResult = AnalyticsEmpty | AnalyticsData;
 // ── Hook ──────────────────────────────────────────────────────────────────────
 export function useAnalytics(): AnalyticsResult {
   const { snapshot, mode } = useLiveData();
-  const { range }          = useDateRange();
+  const { stats: csvStats } = useCsvData();   // FIX: read CSV stats
+  const { range }           = useDateRange();
 
   return useMemo<AnalyticsResult>(() => {
+
+    // ── CSV mode — serve data from the uploaded CSV stats ─────────────────
+    if (mode === "csv") {
+      if (!csvStats) return { isEmpty: true, source: "none" };
+
+      const isAllTime = range.label === "All time";
+
+      const signupsByMonth = isAllTime
+        ? csvStats.signupsByMonth
+        : filterMonths(csvStats.signupsByMonth, range.from, range.to);
+
+      const cohortRetention = isAllTime
+        ? csvStats.cohortRetention
+        : filterMonths(csvStats.cohortRetention, range.from, range.to);
+
+      const filteredSignups    = signupsByMonth.reduce((a, m) => a + m.signups, 0);
+      const filteredSubscribed = signupsByMonth.reduce((a, m) => a + m.subs,    0);
+
+      return {
+        isEmpty: false,
+        source: "csv",
+        totalUsers:         csvStats.totalUsers,
+        subscribed:         csvStats.subscribed,
+        activation:         csvStats.activation,
+        conversion:         csvStats.conversion,
+        draftsCreated:      csvStats.draftsCreated,
+        zeroEngagement:     csvStats.zeroEngagement,
+        engagementSegments: csvStats.engagementSegments,
+        featureAdoption:    csvStats.featureAdoption,
+        planBreakdown:      csvStats.planBreakdown,
+        featureDepthFunnel: csvStats.featureDepthFunnel,
+        signupsByMonth,
+        cohortRetention,
+        filteredSignups,
+        filteredSubscribed,
+      };
+    }
+
+    // ── None mode — no data ───────────────────────────────────────────────
     if (!snapshot || mode === "none") {
       return { isEmpty: true, source: "none" };
     }
 
+    // ── Demo / Live API mode ──────────────────────────────────────────────
     const isAllTime = range.label === "All time";
 
     const signupsByMonth = isAllTime
@@ -99,7 +144,7 @@ export function useAnalytics(): AnalyticsResult {
       filteredSignups,
       filteredSubscribed,
     };
-  }, [snapshot, mode, range]);
+  }, [snapshot, mode, csvStats, range]);
 }
 
 // ── Shared empty-state component (used by every page) ────────────────────────
@@ -148,7 +193,6 @@ export const topEvents: {
   { name:"draft.ai_suggestion",   category:"ai",         count:2109, change:+17.6 },
 ];
 
-// ── Conversion scores data (used by Conversion page) ─────────────────────────
 export const conversionScores: {
   user: string;
   score: number;
@@ -166,11 +210,8 @@ export const conversionScores: {
 ];
 
 // ── Static exports for pages not yet on useAnalytics() ───────────────────────
-// Derived from analyticsData (LawgicHub CSV snapshot).
-
 const { totalUsers, featureDepthFunnel, zeroEngagement: zeroCount } = analyticsData;
 
-/** Detail pages + FeatureAdoption heatmap (% of activated users). */
 export const featureAdoption = [
   { feature: "Draft",            users: 181, adoption: 86.6, trend:  12 },
   { feature: "Research",         users:  41, adoption: 19.6, trend:   8 },

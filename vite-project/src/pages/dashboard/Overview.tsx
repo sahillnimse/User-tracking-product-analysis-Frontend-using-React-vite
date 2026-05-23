@@ -1,5 +1,9 @@
 // src/pages/dashboard/Overview.tsx
-import { Users, UserPlus, Zap, DollarSign, Activity, FileText } from "lucide-react";
+// FIX: "Total users" StatCard is now clickable and opens a full user table modal.
+// FIX: source badge updated to handle "csv" mode in addition to "live"/"demo".
+
+import { useState } from "react";
+import { Users, UserPlus, Zap, DollarSign, Activity, FileText, X, Search } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend,
@@ -7,7 +11,9 @@ import {
 import { StatCard, PanelCard } from "@/components/dashboard/StatCard";
 import { EmptyDataState }      from "@/components/dashboard/EmptyDataState";
 import { useAnalytics }        from "@/hooks/useAnalytics";
-import { useDateRange }        from "@/context/AppContext";
+import { useDateRange, useCsvData } from "@/context/AppContext";
+import { cn } from "@/lib/utils";
+import type { UserRow } from "@/types";
 
 const fmt = (n: number) => n.toLocaleString();
 const tooltipStyle = {
@@ -18,9 +24,164 @@ const tooltipStyle = {
   fontSize: 11,
 };
 
+// ── User Table Modal ──────────────────────────────────────────────────────────
+// Shown when the Total Users stat card is clicked.
+// Uses raw CSV rows when available, falls back to a summary table for demo mode.
+
+interface UserTableModalProps {
+  rows: UserRow[];
+  columns: string[];
+  totalCount: number;
+  onClose: () => void;
+}
+
+function UserTableModal({ rows, columns, totalCount, onClose }: UserTableModalProps) {
+  const [query, setQuery] = useState("");
+  const [page,  setPage]  = useState(0);
+  const PAGE_SIZE = 20;
+
+  const filtered = query
+    ? rows.filter(r => Object.values(r).some(v => v.toLowerCase().includes(query.toLowerCase())))
+    : rows;
+
+  const paged   = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const pages   = Math.ceil(filtered.length / PAGE_SIZE);
+
+  // Show the most informative columns first; hide ultra-wide ones in overflow
+  const priorityCols  = ["Username", "Email", "Plan", "Subscribed", "Draft used",
+                         "Research used", "Query", "Created"];
+  const displayCols = [
+    ...priorityCols.filter(c => columns.includes(c)),
+    ...columns.filter(c => !priorityCols.includes(c)),
+  ].slice(0, 8); // cap at 8 visible columns to avoid overflow
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="flex flex-col w-full max-w-5xl max-h-[85vh] rounded-xl border border-border
+        bg-card shadow-2xl overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-5 py-4 shrink-0">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-foreground">All Users</h2>
+            <p className="font-mono text-xs text-muted-foreground mt-0.5">
+              {fmt(filtered.length)} of {fmt(totalCount)} users
+              {query && " matching search"}
+            </p>
+          </div>
+          <button onClick={onClose}
+            className="rounded-md border border-border/60 p-1.5 text-muted-foreground
+              hover:text-foreground transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="border-b border-border px-5 py-3 shrink-0">
+          <div className="flex items-center gap-2 rounded-md border border-border/60
+            bg-muted/40 px-3 py-1.5 max-w-sm">
+            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <input
+              value={query}
+              onChange={e => { setQuery(e.target.value); setPage(0); }}
+              placeholder="Search by name, email, plan…"
+              className="bg-transparent font-mono text-xs outline-none w-full
+                placeholder:text-muted-foreground text-foreground"
+            />
+            {query && (
+              <button onClick={() => { setQuery(""); setPage(0); }}
+                className="text-muted-foreground hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-auto">
+          {paged.length === 0 ? (
+            <div className="flex h-40 items-center justify-center">
+              <p className="font-mono text-xs text-muted-foreground">No users match your search.</p>
+            </div>
+          ) : (
+            <table className="w-full font-mono text-xs">
+              <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-widest
+                    text-muted-foreground whitespace-nowrap">#</th>
+                  {displayCols.map(c => (
+                    <th key={c} className="px-4 py-2.5 text-left text-[10px] uppercase tracking-widest
+                      text-muted-foreground whitespace-nowrap">{c}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((row, i) => (
+                  <tr key={i}
+                    className="border-t border-border/40 hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-2 text-muted-foreground/60">
+                      {page * PAGE_SIZE + i + 1}
+                    </td>
+                    {displayCols.map(c => {
+                      const val = row[c] ?? "—";
+                      const isSubscribed = c === "Subscribed" && val.toLowerCase() === "yes";
+                      return (
+                        <td key={c} className="px-4 py-2 max-w-[200px] truncate" title={val}>
+                          {isSubscribed ? (
+                            <span className="rounded bg-primary/15 px-1.5 py-0.5 font-semibold text-primary">
+                              Yes
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">{val || "—"}</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {pages > 1 && (
+          <div className="flex items-center justify-between border-t border-border
+            px-5 py-3 shrink-0">
+            <p className="font-mono text-xs text-muted-foreground">
+              Page {page + 1} of {pages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="rounded-md border border-border/60 px-3 py-1 font-mono text-xs
+                  text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors">
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(pages - 1, p + 1))}
+                disabled={page === pages - 1}
+                className="rounded-md border border-border/60 px-3 py-1 font-mono text-xs
+                  text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors">
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Overview page ─────────────────────────────────────────────────────────────
 export default function Overview() {
   const analytics = useAnalytics();
   const { range } = useDateRange();
+  const { stats: csvStats } = useCsvData();
+
+  const [showUserTable, setShowUserTable] = useState(false);
 
   if (analytics.isEmpty) return <EmptyDataState />;
 
@@ -34,7 +195,6 @@ export default function Overview() {
   const lastMonth   = months[months.length - 1];
   const prevMonth   = months[months.length - 2];
   const activeUsers = totalUsers - zeroEngagement;
-  const lastSignups = lastMonth?.signups ?? 0;
   const mrrEstimate = subscribed * 699;
 
   const signupDeltaNum: number | undefined =
@@ -61,8 +221,34 @@ export default function Overview() {
       : 0,
   }));
 
+  // Raw rows for the user table — available when in CSV mode
+  const rawRows    = csvStats?.rows    ?? [];
+  const rawColumns = csvStats?.columns ?? [];
+  const hasRawRows = rawRows.length > 0;
+
+  // FIX: source badge handles "csv" in addition to "live" / "demo"
+  const sourceBadgeClass =
+    source === "live" ? "bg-primary/15 text-primary" :
+    source === "csv"  ? "bg-emerald-400/15 text-emerald-400" :
+    "bg-amber-400/15 text-amber-400";
+
+  const sourceBadgeLabel =
+    source === "live" ? "Live" :
+    source === "csv"  ? "CSV"  : "Demo";
+
   return (
     <div className="space-y-6">
+
+      {/* User table modal */}
+      {showUserTable && (
+        <UserTableModal
+          rows={hasRawRows ? rawRows : []}
+          columns={hasRawRows ? rawColumns : []}
+          totalCount={totalUsers}
+          onClose={() => setShowUserTable(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -71,17 +257,22 @@ export default function Overview() {
             LawgicHub · {range.label} · {fmt(filteredSignups)} signups in period
           </p>
         </div>
-        <span className={`rounded-full px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest
-          ${source === "live"
-            ? "bg-primary/15 text-primary"
-            : "bg-amber-400/15 text-amber-400"}`}>
-          {source === "live" ? "Live" : "Demo"}
+        <span className={cn("rounded-full px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest",
+          sourceBadgeClass)}>
+          {sourceBadgeLabel}
         </span>
       </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Total users"  value={fmt(totalUsers)}        delta={signupDeltaNum} icon={Users} />
+        {/* FIX: Total Users card is now clickable — opens user table modal */}
+        <StatCard
+          label="Total users"
+          value={fmt(totalUsers)}
+          delta={signupDeltaNum}
+          icon={Users}
+          onClick={() => setShowUserTable(true)}
+        />
         <StatCard label="New signups"  value={fmt(filteredSignups)}   delta={signupDeltaNum} icon={UserPlus} />
         <StatCard label="Activation"   value={`${activation}%`}       note={`${fmt(activeUsers)} active`} icon={Zap} />
         <StatCard label="Conversion"   value={`${conversion}%`}       note={`${subscribed} paid`} icon={Activity} />

@@ -1,4 +1,8 @@
 // src/lib/storage.ts
+// FIX moderate-9: window.dispatchEvent now guarded with typeof window check
+//   so it doesn't throw in SSR / non-browser test environments, and only
+//   fires when stats is non-null (there are no listeners for the clear case).
+
 import type { ParsedStats } from "@/types";
 
 const KEYS = {
@@ -29,7 +33,12 @@ export function saveStats(stats: ParsedStats | null): void {
       localStorage.removeItem(KEYS.STATS);
     }
   } catch { /* quota */ }
-  window.dispatchEvent(new Event(CSV_UPDATED_EVENT));
+
+  // FIX: guard against SSR / test environments that have no `window`, and
+  // skip the dispatch when stats is null (no listener reacts to clear anyway).
+  if (stats && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(CSV_UPDATED_EVENT));
+  }
 }
 
 export function loadRawCSV(): { text: string; name: string } | null {

@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
-import heroBg from "@/assets/hero-bg.jpg";
 
 const HeroSection = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
       <div className="absolute inset-0 z-0">
-        <img src={heroBg} alt="" className="h-full w-full object-cover opacity-30" />
+      <div className="h-full w-full bg-gradient-to-br from-primary/20 via-background to-muted/40" />
+
         <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
       </div>
 
